@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  ~ Copyright (c) 2009-2014. 上海诺诺镑客 All rights reserved.
+  ~ @(#) spring-mvc.xml 2014-10-27 16:42
+  -->
+
+<beans xmlns="http://www.springframework.org/schema/beans"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xmlns:util="http://www.springframework.org/schema/util"
+	xmlns:context="http://www.springframework.org/schema/context"
+	xmlns:mvc="http://www.springframework.org/schema/mvc"
+	xsi:schemaLocation="http://www.springframework.org/schema/mvc http://www.springframework.org/schema/mvc/spring-mvc-4.2.xsd
+		http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-4.2.xsd
+		http://www.springframework.org/schema/context http://www.springframework.org/schema/context/spring-context-4.2.xsd
+		http://www.springframework.org/schema/util http://www.springframework.org/schema/util/spring-util-4.2.xsd">
+
+	<bean name="cacheclinet" class="com.nonobank.architecture.cache.CacheClient">
+		<constructor-arg  ref="codisconfig" />
+	</bean>
+	<bean name="codisconfig" class="com.nonobank.architecture.cache.CacheConfig">
+		<property name="maxTotal" value="${codis.pool.maxTotal}"/>
+		<property name="maxIdle" value="${codis.pool.maxIdle}"/>
+		<property name="minIdle" value="${codis.pool.minIdle}"/>
+		<property name="maxWaitMillis" value="${codis.pool.maxWaitMillis}"/>
+		<property name="zkAddressAndPort" value="${codis.zk.zkAddressAndPort}"/>
+		<property name="zkSessionTimeOutMs" value="${codis.zk.zkSessionTimeOutMs}"/>
+		<property name="zkProxyDir" value="${codis.zk.zkProxyDir}"/>
+		<property name="debug" value="${codis.debug}"/>
+		<property name="envrionment" value="${codis.envrionment}"/>
+	</bean>
+</beans>
