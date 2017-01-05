@@ -36,6 +36,33 @@ public class CacheClientTest {
         System.out.println("--test Set return---"+cacheclient.set("testSetKey","testSetValue")+"--");
     }
 
+    @Test
+    public void testSetRetry() throws Exception {
+        System.out.println("--test SetRetry return---"+cacheclient.setWithRetry("testSetKey","testSetValue",2,1)+"--");
+    }
+
+    @Test
+    public void testgetRetry() throws Exception {
+        System.out.println("--test getRetry return---"+cacheclient.getWithRetry("testSetKey",2,1)+"--");
+    }
+
+    @Test
+    public void testDelWithRetry() throws Exception {
+        System.out.println("--test delRetry return---"+cacheclient.delWithRetry(2,1,"testSetKey")+"--");
+    }
+
+    @Test
+    public void testExpireWithRetry() throws Exception {
+        cacheclient.set("testSetKey","adf");
+        System.out.println("--test expireRetry return---"+cacheclient.expireWithRetry("testSetKey",2,2,1)+"--");
+    }
+
+    @Test
+    public void testSetExpireWithRetry() throws Exception {
+        cacheclient.set("testSetKey","adf");
+        System.out.println("--test setExpireRetry return---"+cacheclient.setExpireWithRetry("testSetKey",2,"value",2,1)+"--");
+    }
+
     /**
      * Method: get(String key)
      */

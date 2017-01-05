@@ -10,6 +10,16 @@ import java.util.Set;
 
 public interface AbstractCacheClient {
 
+	public String setExpireWithRetry(String key, int seconds, String value, int retryTimes, int sleepSeconds);
+
+	public Boolean setWithRetry(String key, String value, int retryTimes, int sleepSeconds);
+
+	public Long delWithRetry(int retryTimes, int sleepSeconds, String... keys);
+
+	public Boolean expireWithRetry(String key, int seconds, int retryTimes, int sleepSeconds);
+
+	public String getWithRetry(String key, int retryTimes, int sleepSeconds);
+
 	public Boolean set(String key, String value);
 
 	public String get(String key);

@@ -1,23 +1,19 @@
 package com.nonobank.architecture.cache;
 
+import com.google.common.base.Strings;
+import com.nonobank.architecture.enumeration.CacheEnvironment;
 import com.nonobank.architecture.enumeration.ListPosition;
 import io.codis.jodis.JedisResourcePool;
 import io.codis.jodis.RoundRobinJedisPool;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import redis.clients.jedis.Jedis;
+import redis.clients.jedis.SortingParams;
+import redis.clients.jedis.Tuple;
 
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import com.google.common.base.Strings;
-import com.nonobank.architecture.enumeration.CacheEnvironment;
-
-import redis.clients.jedis.BinaryClient;
-import redis.clients.jedis.Jedis;
-import redis.clients.jedis.SortingParams;
-import redis.clients.jedis.Tuple;
 
 public class CacheClient implements AbstractCacheClient {
 
@@ -44,6 +40,110 @@ public class CacheClient implements AbstractCacheClient {
         }
         return jedisPool;
     }
+
+    public String setExpireWithRetry(String key, int seconds, String value, int retryTimes, int sleepSeconds){
+        int cur_time = 0;
+        for (; cur_time < retryTimes; ++cur_time) {
+            try (Jedis jedis = jedisPool.getResource()) {
+                return jedis.setex(key, seconds, value);
+            } catch (Exception e) {
+                log.info("cannot get redis client,retry currentTime: " + cur_time + " Excepton: " + e.toString());
+                e.printStackTrace();
+                try {
+                    if (cur_time == retryTimes - 1) {
+                        throw e;
+                    }
+                    Thread.sleep(sleepSeconds * 1000);
+                } catch (InterruptedException e1) {
+                    e.printStackTrace();
+                }
+            }
+        }
+        return null;
+    }
+
+    public Boolean setWithRetry(String key, String value, int retryTimes, int sleepSeconds){
+        int cur_time = 0;
+        for (; cur_time < retryTimes; ++cur_time) {
+            try (Jedis jedis = jedisPool.getResource()) {
+                return jedis.set(key, value).equals("OK") ? true : false;
+            } catch (Exception e) {
+                log.info("cannot get redis client,retry currentTime: " + cur_time + " Excepton: " + e.toString());
+                e.printStackTrace();
+                try {
+                    if (cur_time == retryTimes - 1) {
+                        throw e;
+                    }
+                    Thread.sleep(sleepSeconds * 1000);
+                } catch (InterruptedException e1) {
+                    e.printStackTrace();
+                }
+            }
+        }
+        return null;
+    }
+
+    public Long delWithRetry(int retryTimes, int sleepSeconds, String... keys) {
+        int cur_time = 0;
+        for (; cur_time < retryTimes; ++cur_time) {
+            try (Jedis jedis = jedisPool.getResource()) {
+                return jedis.del(keys);
+            } catch (Exception e) {
+                log.info("cannot get redis client,retry currentTime: " + cur_time + " Excepton: " + e.toString());
+                e.printStackTrace();
+                try {
+                    if (cur_time == retryTimes - 1) {
+                        throw e;
+                    }
+                    Thread.sleep(sleepSeconds * 1000);
+                } catch (InterruptedException e1) {
+                    e.printStackTrace();
+                }
+            }
+        }
+        return null;
+    }
+
+    public Boolean expireWithRetry(String key, int seconds, int retryTimes, int sleepSeconds){
+        int cur_time = 0;
+        for (; cur_time < retryTimes; ++cur_time) {
+            try (Jedis jedis = jedisPool.getResource()) {
+                return jedis.expire(key, seconds) == 1 ? true : false;
+            } catch (Exception e) {
+                log.info("cannot get redis client,retry currentTime: " + cur_time + " Excepton: " + e.toString());
+                e.printStackTrace();
+                try {
+                    if (cur_time == retryTimes - 1) {
+                        throw e;
+                    }
+                    Thread.sleep(sleepSeconds * 1000);
+                } catch (InterruptedException e1) {
+                    e.printStackTrace();
+                }
+            }
+        }
+        return null;
+    }
+
+    public String getWithRetry(String key, int retryTimes, int sleepSeconds) {
+        int cur_time = 0;
+        for (; cur_time < retryTimes; ++cur_time) {
+            try (Jedis jedis = jedisPool.getResource()) {
+                return jedis.get(key);
+            } catch (Exception e) {
+                log.info("cannot get redis client,retry currentTime: " + cur_time + " Excepton: " + e.toString());
+                try {
+                    if (cur_time == retryTimes - 1) {
+                        throw e;
+                    }
+                    Thread.sleep(sleepSeconds * 1000);
+                } catch (InterruptedException e1) {
+                }
+            }
+        }
+        return null;
+    }
+
 
     public Boolean set(String key, String value) {
 //		key=keyWapper(key);
@@ -203,6 +303,7 @@ public class CacheClient implements AbstractCacheClient {
     /**
      * 存储在key字符串值的长度
      * 当key持有非字符串值则返回一个错误
+     *
      * @param key
      * @return 字符串key长度，或0表示key不存在
      */
@@ -223,6 +324,7 @@ public class CacheClient implements AbstractCacheClient {
      * key的整数值减1,如果该键不存在时，它初始被设置为0
      * 如果键包含了错误类型的值或包含不能被表示为整数，字符串，则返回错误。
      * 本操作的值限制在 64 位(bit)有符号数字表示之内
+     *
      * @param key
      * @return
      */
@@ -243,6 +345,7 @@ public class CacheClient implements AbstractCacheClient {
      * 如果 key 不存在，那么 key 的值会先被初始化为 0 ，然后再执行 DECRBY 操作
      * 如果值包含错误的类型，或字符串类型的值不能表示为数字，那么返回一个错误。
      * 本操作的值限制在 64 位(bit)有符号数字表示之内
+     *
      * @param key
      * @param integer
      * @return
@@ -261,6 +364,7 @@ public class CacheClient implements AbstractCacheClient {
 
     /**
      * 用于删除已存在的键。不存在的 key 会被忽略
+     *
      * @param keys
      * @return 被删除的键的数目
      */
@@ -716,6 +820,7 @@ public class CacheClient implements AbstractCacheClient {
 
     /**
      * 删除，并返回保存列表(key)的第一个元素
+     *
      * @param key
      * @return 返回字符串，第一个元素的值，或者为null 如果key不存在
      */
@@ -855,6 +960,7 @@ public class CacheClient implements AbstractCacheClient {
 
     /**
      * 删除，并返回列表保存在key的最后一个元素
+     *
      * @param key
      * @return 返回最后一个元素的值，或者key不存在返回null
      */
@@ -972,6 +1078,7 @@ public class CacheClient implements AbstractCacheClient {
 
     /**
      * 指定的 key 设置值及其过期时间,如果 key 已经存在,会替换旧的值
+     *
      * @param key
      * @param seconds
      * @param value
@@ -1029,6 +1136,7 @@ public class CacheClient implements AbstractCacheClient {
     /**
      * 排序是基于数字的，各个元素将会被转化成双精度浮点数来进行大小比较
      * 如果key是一个包含了数字元素的列表，那么上面的命令将会返回升序排列的一个列表
+     *
      * @param key
      * @return
      */
@@ -1083,6 +1191,7 @@ public class CacheClient implements AbstractCacheClient {
 
     /**
      * 只提供了 key 参数，那么返回集合中的一个随机元素
+     *
      * @param key
      * @return
      */
@@ -1102,14 +1211,15 @@ public class CacheClient implements AbstractCacheClient {
      * 如果 count 为正数，且小于集合基数，那么命令返回一个包含 count 个元素的数组，数组中的元素各不相同
      * 如果 count 大于等于集合基数，那么返回整个集合
      * 如果 count 为负数，那么命令返回一个数组，数组中的元素可能会重复出现多次，而数组的长度为 count 的绝对值
+     *
      * @param key
      * @param count
      * @return
      */
     @Override
-    public List<String> srandmember(String key,int count) {
+    public List<String> srandmember(String key, int count) {
         try (Jedis jedis = jedisPool.getResource()) {
-            return jedis.srandmember(key,count);
+            return jedis.srandmember(key, count);
         } catch (Exception e) {
             if (config.getDebug()) {
                 log.info(e.getMessage());
@@ -1119,8 +1229,9 @@ public class CacheClient implements AbstractCacheClient {
     }
 
     /**
-     *移除集合中的一个或多个成员元素，不存在的成员元素会被忽略。
+     * 移除集合中的一个或多个成员元素，不存在的成员元素会被忽略。
      * 当 key 不是集合类型，返回一个错误
+     *
      * @param key
      * @param members
      * @return 被成功移除的元素的数量，不包括被忽略的元素
@@ -1139,6 +1250,7 @@ public class CacheClient implements AbstractCacheClient {
 
     /**
      * getrange替代返回key对应的字符串value的子串,这个子串是由start和end位移决定的(两者都在string内)
+     *
      * @param key
      * @param start
      * @param end
@@ -1159,8 +1271,9 @@ public class CacheClient implements AbstractCacheClient {
 
     /**
      * 返回 key 所储存的值的类型
+     *
      * @param key
-     * @return none(key不存在),string (字符串),list (列表),set (集合),zset (有序集),hash (哈希表)
+     * @return none(key不存在), string (字符串),list (列表),set (集合),zset (有序集),hash (哈希表)
      */
     @Override
     public String type(String key) {
@@ -1177,13 +1290,14 @@ public class CacheClient implements AbstractCacheClient {
     /**Sorted Set 有序集合 **/
 
     /**
-     *将一个元素及其分数值加入到有序集当中
+     * 将一个元素及其分数值加入到有序集当中
      * 如果某个成员已经是有序集的成员，那么更新这个成员的分数值，并通过重新插入这个成员元素，来保证该成员在正确的位置上
      * 分数值可以是整数值或双精度浮点数,当 key 存在但不是有序集类型时，返回一个错误。
+     *
      * @param key
      * @param score
      * @param member
-     * @return  被成功添加的新成员的数量，不包括那些被更新的、已经存在的成员。
+     * @return 被成功添加的新成员的数量，不包括那些被更新的、已经存在的成员。
      */
     @Override
     public Long zadd(String key, double score, String member) {
@@ -1199,6 +1313,7 @@ public class CacheClient implements AbstractCacheClient {
 
     /**
      * 将多个元素及其分数值加入到有序集当中
+     *
      * @param key
      * @param scoreMembers
      * @return
@@ -1217,6 +1332,7 @@ public class CacheClient implements AbstractCacheClient {
 
     /**
      * 返回在指定的键存储在有序集合中的元素的数量
+     *
      * @param key
      * @return 返回整数，有序集合元素的数量，或者如果键不存在则返回0
      */
@@ -1234,6 +1350,7 @@ public class CacheClient implements AbstractCacheClient {
 
     /**
      * 计算有序集合中指定分数区间的成员数量
+     *
      * @param key
      * @param min
      * @param max
@@ -1267,6 +1384,7 @@ public class CacheClient implements AbstractCacheClient {
      * 为有序集 key 的成员 member 的 score 值加上增量 increment
      * 当 key 不是有序集类型时，返回一个错误。
      * score 值可以是整数值或双精度浮点数。
+     *
      * @param key
      * @param score
      * @param member
@@ -1289,6 +1407,7 @@ public class CacheClient implements AbstractCacheClient {
      * 其中成员的位置按 score 值递增(从小到大)来排序
      * 以 0 表示有序集第一个成员,以 -1 表示最后一个成员
      * 超出范围的下标并不会引起错误
+     *
      * @param key
      * @param start
      * @param end
@@ -1309,6 +1428,7 @@ public class CacheClient implements AbstractCacheClient {
     /**
      * 返回有序集 key 中，所有 score 值介于 min 和 max 之间(包括等于 min 或 max )的成员
      * 有序集成员按 score 值递增(从小到大)次序排列。
+     *
      * @param key
      * @param min
      * @param max
@@ -1327,7 +1447,6 @@ public class CacheClient implements AbstractCacheClient {
     }
 
     /**
-     *
      * @param key
      * @param min    最小分数
      * @param max    最大分数
@@ -1439,9 +1558,10 @@ public class CacheClient implements AbstractCacheClient {
 
     /**
      * 返回有序集中指定成员的排名。其中有序集成员按分数值递增(从小到大)顺序排列(从0开始)。
+     *
      * @param key
      * @param member
-     * @return  如果成员是有序集 key 的成员，返回 member 的排名。 如果成员不是有序集 key 的成员，返回 null 。
+     * @return 如果成员是有序集 key 的成员，返回 member 的排名。 如果成员不是有序集 key 的成员，返回 null 。
      */
     @Override
     public Long zrank(String key, String member) {
@@ -1458,6 +1578,7 @@ public class CacheClient implements AbstractCacheClient {
     /**
      * 移除有序集中的一个或多个成员，不存在的成员将被忽略。
      * 当 key 存在但不是有序集类型时，返回一个错误
+     *
      * @param key
      * @param members
      * @return 被成功移除的成员的数量，不包括被忽略的成员
@@ -1476,6 +1597,7 @@ public class CacheClient implements AbstractCacheClient {
 
     /**
      * 删除有序集合保存在key开始和结束的排序所有元素
+     *
      * @param key
      * @param start
      * @param end
@@ -1640,6 +1762,7 @@ public class CacheClient implements AbstractCacheClient {
     /**
      * 返回有序集中成员的排名。其中有序集成员按分数值递减(从大到小)排序
      * 排名以 0 为底，也就是说， 分数值最大的成员排名为 0
+     *
      * @param key
      * @param member
      * @return
@@ -1657,7 +1780,8 @@ public class CacheClient implements AbstractCacheClient {
     }
 
     /**
-     *返回有序集中，成员的分数值,如果成员元素不是有序集 key 的成员，或 key 不存在，返回 null
+     * 返回有序集中，成员的分数值,如果成员元素不是有序集 key 的成员，或 key 不存在，返回 null
+     *
      * @param key
      * @param member
      * @return
